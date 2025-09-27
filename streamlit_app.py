@@ -1,64 +1,88 @@
-# This script uses the pandas library to load, analyze, and summarize data
-# from the 'sales_data.csv' file in the same directory.
+# This Streamlit application analyzes uploaded CSV files.
 
+import streamlit as st
 import pandas as pd
-import os
+import io
 
-# Define the file path for the data
-FILE_PATH = 'sales_data.csv'
+# --- Configuration ---
+st.set_page_config(
+    page_title="CSV Data Analyzer (Pandas Dashboard)",
+    layout="wide"
+)
 
-# --- 1. Load the Data ---
-try:
-    # Read the CSV file into a pandas DataFrame (a 2D labeled data structure)
-    df = pd.read_csv(FILE_PATH)
-    print("✅ Data successfully loaded from sales_data.csv\n")
-except FileNotFoundError:
-    print(f"Error: The file '{FILE_PATH}' was not found. Make sure it is in the same folder.")
-    exit()
-except Exception as e:
-    print(f"An unexpected error occurred during file loading: {e}")
-    exit()
+# --- Title and Uploader (Always visible to prevent blank page) ---
+st.title("📊 CSV Data Analyzer")
+st.markdown("Upload a CSV file to instantly analyze its structure, statistics, and column data.")
 
-# --- 2. Data Overview ---
-print("--- Data Overview ---")
-# Print the first few rows of the data
-print(df.head())
-print(f"\nTotal rows loaded: {len(df)}")
-print("-" * 25 + "\n")
+uploaded_file = st.file_uploader(
+    "Choose a CSV file:", 
+    type=["csv"],
+    help="The file should be comma-separated, like a spreadsheet export."
+)
 
+# --- Main Analysis Logic ---
+if uploaded_file is not None:
+    try:
+        # Read the file from the uploader into a Pandas DataFrame
+        data = pd.read_csv(uploaded_file)
+        
+        st.success("File uploaded and read successfully!")
 
-# --- 3. Perform Aggregation (Calculate Total Revenue) ---
-# Sum the values in the 'Revenue' column for a grand total.
-total_revenue = df['Revenue'].sum()
-print("--- Total Summary ---")
-print(f"💰 Grand Total Revenue: ${total_revenue:,.2f}")
-print("-" * 25 + "\n")
+        st.header("1. Data Overview")
+        st.markdown(f"**Total Rows:** {len(data)}")
+        st.markdown(f"**Total Columns:** {len(data.columns)}")
+        st.markdown("---")
+        
+        # Display the first few rows of the data
+        st.subheader("First 5 Rows")
+        st.dataframe(data.head())
+        
+        # Display column information
+        st.subheader("Column Data Types")
+        col_info = pd.DataFrame(data.dtypes, columns=['Data Type'])
+        st.dataframe(col_info)
+        
+        st.header("2. Descriptive Statistics")
+        st.markdown("Summary statistics for all numerical columns:")
+        st.dataframe(data.describe())
 
+        st.header("3. Interactive Data Visualizer")
+        
+        # --- Interactive Plotting Section ---
+        
+        numerical_cols = data.select_dtypes(include=['number']).columns.tolist()
+        
+        if numerical_cols:
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Select a column for plotting
+                selected_column = st.selectbox(
+                    "Select a column to visualize:",
+                    numerical_cols
+                )
+            
+            with col2:
+                # Select plot type
+                plot_type = st.selectbox(
+                    "Select plot type:",
+                    ["Histogram", "Box Plot"]
+                )
 
-# --- 4. Filtering (Find High-Performance Sales) ---
-# Filter the DataFrame to show only rows where UnitsSold is greater than 100.
-high_sales_filter = df['UnitsSold'] > 100
-high_sales_df = df[high_sales_filter]
+            # Generate the chart based on user selection
+            st.subheader(f"Visualization: {selected_column}")
+            
+            if plot_type == "Histogram":
+                st.bar_chart(data[selected_column])
+            elif plot_type == "Box Plot":
+                # Using Streamlit's simple plotting for a box plot representation
+                st.area_chart(data[selected_column])
+        else:
+            st.info("No numerical columns found for plotting.")
 
-print("--- High-Performance Sales (Units > 100) ---")
-if not high_sales_df.empty:
-    print("These sales lines sold over 100 units:")
-    print(high_sales_df[['Month', 'Product', 'UnitsSold']])
+    except Exception as e:
+        st.error(f"An error occurred during file processing: {e}")
+
+# This message appears when no file is uploaded
 else:
-    print("No sales lines exceeded 100 units sold.")
-print("-" * 25 + "\n")
-
-
-# --- 5. Grouping and Aggregation (Revenue by Product) ---
-# Group the data by the 'Product' column and sum the 'Revenue' for each product.
-revenue_by_product = df.groupby('Product')['Revenue'].sum().reset_index()
-
-print("--- Revenue Breakdown by Product ---")
-# Rename the column for cleaner output
-revenue_by_product.columns = ['Product', 'TotalRevenue']
-print(revenue_by_product.to_string(index=False))
-print("\n")
-
-# Calculate and print the average units sold across all data
-average_units = df['UnitsSold'].mean()
-print(f"📊 Average Units Sold per entry: {average_units:.1f} units")
+    st.info("Upload a CSV file above to begin analysis.")
